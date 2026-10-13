@@ -85,6 +85,13 @@ async function main() {
   const repo = process.env.GITHUB_REPOSITORY;
   const runId = values['run-id'];
   if (!repo || !runId || !/^\d+$/.test(runId)) throw new Error('need GITHUB_REPOSITORY and a numeric --run-id');
+  // Forks can run the inherited schedule without enabling GitHub Issues.
+  // Check the capability before touching labels or issues; API errors still fail.
+  const repository = JSON.parse(gh(['api', `repos/${repo}`]));
+  if (repository.has_issues === false) {
+    console.log(`Skipping tracker for ${repo}: GitHub Issues are disabled.`);
+    return;
+  }
   const run = JSON.parse(gh(['api', `repos/${repo}/actions/runs/${runId}`]));
   const jobs = gh(['api', '--paginate', `repos/${repo}/actions/runs/${runId}/jobs?per_page=100`,
     '--jq', '.jobs[] | {name, conclusion, html_url, steps: [.steps[]? | {name, conclusion}]}'])

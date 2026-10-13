@@ -49,8 +49,12 @@ jobs:
     steps:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
-          sparse-checkout: tests/install/e2e-assets/red-tracker.mjs
+          sparse-checkout: |
+            tests/install/e2e-assets/red-tracker.mjs
+            tests/install/e2e-assets/red-tracker.test.mjs
           sparse-checkout-cone-mode: false
+      - name: Verify tracker behavior
+        run: node --test tests/install/e2e-assets/red-tracker.test.mjs
       - name: Open, update or close the tracker
         env:
           GH_TOKEN: ${{ github.token }}
