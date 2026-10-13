@@ -77,6 +77,11 @@ on:
         description: "Artifact-safe matrix leg id (from generate-e2e-matrix.mjs legId). Names this leg's logs + player artifacts so the report job can link a row to its zip."
         required: true
         type: string
+      source-runner:
+        description: 'Runner for source/script legs; bundled runners are selected independently.'
+        required: false
+        type: string
+        default: windows-latest-32-core
       setup-exe-url:
         description: 'Bootstrap installer to install OLD with. Default: the latest published one — what a user downloads today.'
         required: false
@@ -179,7 +184,7 @@ jobs:
         || (contains(fromJSON('["installer-script+desktop", "hermes-desktop-app-update", "desktop-installer@latest"]'), inputs.update-method) && inputs.tag-has-desktop)
         || (inputs.update-method == 'open-app-update' && inputs.tag-has-desktop
             && contains(fromJSON('["desktop-installer@latest", "installer-script+desktop"]'), inputs.install-method)))
-    runs-on: windows-latest-32-core
+    runs-on: ${{ inputs.source-runner }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
 
     env:
@@ -221,6 +226,10 @@ jobs:
       - name: Install locked chat driver dependencies
         shell: bash
         run: npm ci --workspace tests-js --include-workspace-root --omit=dev --ignore-scripts --no-audit --no-fund
+
+      - name: Verify source runner policy
+        shell: bash
+        run: node --test tests-js/install-e2e-runners.test.mjs
 
       # A released tag prints its one-shot chat through prompt_toolkit, whose Windows
       # output object needs a console screen buffer -- piping the CLI's stdout into the

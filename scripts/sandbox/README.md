@@ -44,4 +44,11 @@ workflow with route=installer-script -> hermes-update and tag-count=1.
 This executes six source legs (one compatible upstream stable → HEAD and
 HEAD → NEXT on each OS), not the full desktop/bundle or historical matrix.
 Passing that subset must not be described as complete installation coverage.
+The tracking fork uses standard windows-latest runners for script installs
+(including source desktop builds); upstream/other forks, release-mode source
+runs, published desktop installers and x64/arm64 bundled runs retain their
+original larger-runner configuration. Runner selection regression:
+
+    node --test tests-js/install-e2e-runners.test.mjs
+
 Schedules, release tags and repository settings are unchanged by this repair.

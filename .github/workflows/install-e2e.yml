@@ -374,6 +374,9 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-matrix.outputs.windows) }}
     uses: ./.github/workflows/install-e2e-windows-run.yml
     with:
+      # Owner-approved standard runners for this tracking fork's script installs.
+      # Releases, upstream/other forks, published GUI installs and bundles stay unchanged.
+      source-runner: ${{ github.repository == 'teamauresta/hermes-agent' && inputs.release != true && startsWith(matrix.install_method, 'installer-script') && 'windows-latest' || 'windows-latest-32-core' }}
       install-method: ${{ matrix.install_method }}
       update-method: ${{ matrix.update_method }}
       install-ref: ${{ matrix.install_ref }}
