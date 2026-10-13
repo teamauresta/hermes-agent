@@ -70,7 +70,7 @@ import { fileURLToPath } from 'node:url';
  *   -- the updater that RESULTS from an update must itself update -- typed
  *   `never[]` so declaring one is a type error until a leg implements it.
  *
- * @typedef {{ref: string, desktop: boolean}} TagAnnotation
+ * @typedef {{ref: string, desktop: boolean, sha?: string, repository?: string}} TagAnnotation
  *   A picked release tag plus what its own tree ships (annotated by
  *   pick-releases in install-e2e.yml).
  *
@@ -79,11 +79,11 @@ import { fileURLToPath } from 'node:url';
  *   it as a synthetic child of the install ref, so a leg starting AT HEAD
  *   still has an update to take.
  *
- * @typedef {{from: string, to: UpdateTarget, desktop: boolean}} Start
+ * @typedef {{from: string, to: UpdateTarget, desktop: boolean, sha?: string, repository?: string}} Start
  *   One column of the plan: install `from`, update to `to`.
  *
  * @typedef {{name: string, leg_id: string, install_method: string, update_method: string,
- *            install_ref: string, update_ref: UpdateTarget, tag_has_desktop?: boolean}} MatrixEntry
+ *            install_ref: string, update_ref: UpdateTarget, tag_has_desktop?: boolean, baseline_repository?: string}} MatrixEntry
  */
 
 /**
@@ -122,7 +122,7 @@ export function bundledMatrix(os, oldTag) {
  */
 export function startsFor(tags) {
   return [
-    ...tags.map((t) => /** @type {Start} */ ({ from: t.ref, to: 'HEAD', desktop: t.desktop })),
+    ...tags.map((t) => /** @type {Start} */ ({ from: t.ref, to: 'HEAD', desktop: t.desktop, sha: t.sha, repository: t.repository })),
     { from: 'HEAD', to: 'NEXT', desktop: true },
   ];
 }
@@ -254,7 +254,8 @@ export function buildMatrices(envs, tags) {
         leg_id: legId(name),
         install_method: env.install,
         update_method: env.update,
-        install_ref: start.from,
+        install_ref: start.sha || start.from,
+        baseline_repository: start.repository || '',
         update_ref: start.to,
         // Every OS declares desktop-surface methods (both app-update
         // variants at minimum), so every leg carries the annotation and
@@ -487,7 +488,7 @@ export function renderMarkdownResults(jobs, tagAnnotations = [], artifactById = 
       byTag.set(tag, cell);
     }
   }
-  if (rows.size === 0) return '### Install & Update E2E results\n\n(no legs found in this run)\n';
+  if (rows.size === 0) return '### Install & Update E2E results\n\nNo installation/update legs executed. Baseline selection or matrix setup did not produce coverage; see prerequisite job conclusions.\n';
   const cells = [...rows.values()].flatMap((r) => [...r.values()]);
   const passed = cells.filter((c) => c.startsWith('&#x2705;')).length;
   const failed = cells.filter((c) => c.startsWith('&#x274C;')).length;
@@ -531,7 +532,7 @@ async function main() {
   });
   if (values.format === 'results') {
     const jobs = (await readStdin()).split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
-    const annotations = /** @type {TagAnnotation[]} */ (JSON.parse(values.tags));
+    const annotations = /** @type {TagAnnotation[]} */ (JSON.parse(values.tags || '[]'));
     /** @type {Map<string, number>} */
     const artifactById = new Map();
     if (values.artifacts) {

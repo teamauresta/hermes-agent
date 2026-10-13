@@ -33,6 +33,11 @@ on:
         required: false
         type: string
         default: refs/heads/main
+      baseline-repository:
+        description: 'Source of a pinned upstream OLD commit; empty keeps same-repository release behavior.'
+        required: false
+        type: string
+        default: ''
       update-ref:
         description: 'What to update TO: HEAD (the commit under test), or NEXT -- a synthetic child of install-ref that the driver mints, so a leg that installs HEAD still has an update to take (HEAD''s own updater).'
         required: false
@@ -90,6 +95,7 @@ jobs:
       update-method: ${{ inputs.update-method }}
       install-ref: ${{ inputs.install-ref }}
       update-ref: ${{ inputs.update-ref }}
+      baseline-repository: ${{ inputs.baseline-repository }}
       tag-has-desktop: ${{ inputs.tag-has-desktop }}
       leg-id: ${{ inputs.leg-id }}
       runner: macos-latest
@@ -122,6 +128,14 @@ jobs:
           cache: false
           cache-python: false
           cache-node: false
+
+      - name: Prepare pinned upstream baseline
+        if: inputs.baseline-repository != ''
+        shell: bash
+        env:
+          BASELINE_REPOSITORY: ${{ inputs.baseline-repository }}
+          BASELINE_SHA: ${{ inputs.install-ref }}
+        run: node scripts/sandbox/release-baselines.mjs prepare --repository "$BASELINE_REPOSITORY" --sha "$BASELINE_SHA"
 
       - name: Install locked chat driver dependencies
         shell: bash

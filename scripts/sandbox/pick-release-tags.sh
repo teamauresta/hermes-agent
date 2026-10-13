@@ -24,7 +24,7 @@
 # checkout has no tags and this exits non-zero rather than silently emitting an
 # empty matrix.
 #
-# Only vYYYY.M.D[.N] release tags are considered; the repo also carries
+# Only numeric stable vX.Y.Z[.N] tags (calendar or semver) are considered; the repo also carries
 # backup/* and one-off tags that are not releases.
 
 set -euo pipefail
@@ -64,12 +64,11 @@ if [ -z "$REPO" ]; then
   REPO="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$script_dir")"
 fi
 
-# sort -V orders v2026.4.8 before v2026.4.13 (numeric), which a plain
-# lexicographic sort gets wrong.
+# Chronology spans the calendar-to-semver transition: numeric sorting would
+# incorrectly consider every v2026.* newer than v0.21.*.
 mapfile -t tags < <(
-  git -C "$REPO" tag --list 'v*' \
-    | grep -E '^v[0-9]{4}\.[0-9]+\.[0-9]+(\.[0-9]+)?$' \
-    | sort -V
+  git -C "$REPO" for-each-ref --sort=creatordate --format='%(refname:short)' 'refs/tags/v*' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'
 )
 
 total="${#tags[@]}"

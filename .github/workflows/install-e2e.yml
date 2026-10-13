@@ -27,7 +27,10 @@ name: Install & Update E2E
 # method is a spec edit, implementing one is flipping the run workflow's
 # gate.
 #
-# The starting versions are chosen at runtime from the repo's release tags
+# This tracking fork samples published upstream stables that are ancestors of
+# the tested commit, pinned by SHA. Release-mode calls still use this repo's
+# own baselines; upstream baselines can never satisfy a stable promotion gate.
+# Other starting versions are chosen at runtime from the repo's release tags
 # (scripts/sandbox/pick-release-tags.sh): newest, oldest, and a spread
 # between. A hardcoded list would stop covering the newest release the day
 # after it ships, and would pin an "oldest" that nobody still runs.
@@ -152,6 +155,7 @@ on:
       - 'tests/install/**'
       - 'scripts/sandbox/generate-e2e-matrix.mjs'
       - 'scripts/sandbox/pick-release-tags.sh'
+      - 'scripts/sandbox/release-baselines*.mjs'
       - 'scripts/ci/setup_toolchain.py'
       - '.github/actions/setup-pm/**'
       - '.github/workflows/install-e2e*.yml'
@@ -181,11 +185,18 @@ jobs:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
           filter: blob:none
+          fetch-depth: 0
           fetch-tags: true
           sparse-checkout: |
             scripts/sandbox/pick-release-tags.sh
             scripts/releases/pick_tags.py
+            scripts/sandbox/release-baselines*.mjs
+            scripts/sandbox/generate-e2e-matrix.mjs
+            tests/install/e2e-assets/release-plan.test.mjs
+            tests/install/e2e-assets/known-failures.json
           sparse-checkout-cone-mode: false
+      - name: Verify release baseline behavior
+        run: node --test scripts/sandbox/release-baselines.test.mjs tests/install/e2e-assets/release-plan.test.mjs
       - id: pick
         env:
           # Inputs never touch shell syntax directly: TAG_COUNT arrives via
@@ -202,9 +213,21 @@ jobs:
           INSTALL_REF: ${{ inputs.install-ref }}
           EXCLUDE_REF: ${{ inputs.exclude-ref }}
           RELEASE_MODE: ${{ inputs.release }}
+          # Explicit policy for this owner-approved tracking fork only.
+          USE_UPSTREAM: ${{ github.repository == 'teamauresta/hermes-agent' && inputs.release != true }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$TAG_COUNT" =~ ^(10|[1-9])$ ]] || { echo "tag-count must be 1-10, got: $TAG_COUNT" >&2; exit 1; }
+          if [ "$USE_UPSTREAM" = true ]; then
+            args=(pick --repository NousResearch/hermes-agent --count "$TAG_COUNT")
+            [ -z "$INSTALL_REF" ] || args+=(--install-ref "$INSTALL_REF")
+            [ -z "$EXCLUDE_REF" ] || args+=(--exclude-ref "$EXCLUDE_REF")
+            enriched="$(node scripts/sandbox/release-baselines.mjs "${args[@]}")"
+            echo "Published upstream baselines (strict ancestors, pinned SHA): $enriched"
+            echo "tags=$enriched" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -n "$INSTALL_REF" ]; then
             [[ "$INSTALL_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo 'install-ref must be an exact release tag' >&2; exit 1; }
             [ "$INSTALL_REF" != "$EXCLUDE_REF" ] || { echo "Candidate cannot be its own baseline" >&2; exit 1; }
@@ -338,6 +361,7 @@ jobs:
       update-method: ${{ matrix.update_method }}
       install-ref: ${{ matrix.install_ref }}
       update-ref: ${{ matrix.update_ref }}
+      baseline-repository: ${{ matrix.baseline_repository }}
       tag-has-desktop: ${{ matrix.tag_has_desktop }}
       leg-id: ${{ matrix.leg_id }}
 
@@ -354,6 +378,7 @@ jobs:
       update-method: ${{ matrix.update_method }}
       install-ref: ${{ matrix.install_ref }}
       update-ref: ${{ matrix.update_ref }}
+      baseline-repository: ${{ matrix.baseline_repository }}
       tag-has-desktop: ${{ matrix.tag_has_desktop }}
       leg-id: ${{ matrix.leg_id }}
 
@@ -372,6 +397,7 @@ jobs:
       update-method: ${{ matrix.update_method }}
       install-ref: ${{ matrix.install_ref }}
       update-ref: ${{ matrix.update_ref }}
+      baseline-repository: ${{ matrix.baseline_repository }}
       tag-has-desktop: ${{ matrix.tag_has_desktop }}
       leg-id: ${{ matrix.leg_id }}
 
